@@ -7,21 +7,59 @@ import com.example.dsy1105_005d_2026.data.local.AppDatabase
 import com.example.dsy1105_005d_2026.data.local.SolicitudEntity
 import com.example.dsy1105_005d_2026.data.repository.SolicitudRepository
 import java.util.UUID
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SolicitudViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = SolicitudRepository(AppDatabase.obtener(app).solicitudDao())
 
-    val solicitudes: StateFlow<List<SolicitudEntity>> = repo.solicitudes
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _busqueda = MutableStateFlow("")
+    val busqueda: StateFlow<String> = _busqueda.asStateFlow()
+
+    private val _categoriaFiltro = MutableStateFlow("")
+    val categoriaFiltro: StateFlow<String> = _categoriaFiltro.asStateFlow()
+
+    val solicitudes: StateFlow<List<SolicitudEntity>> =
+        combine(repo.solicitudes, _busqueda, _categoriaFiltro) { lista, texto, categoria ->
+            lista.filter { s ->
+                (categoria.isEmpty() || s.categoria == categoria) &&
+                    (texto.isBlank() ||
+                        s.titulo.contains(texto, ignoreCase = true) ||
+                        s.codigo.contains(texto, ignoreCase = true))
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _uiState = MutableStateFlow(SolicitudUiState())
     val uiState: StateFlow<SolicitudUiState> = _uiState.asStateFlow()
+
+    fun onBusquedaChange(v: String) {
+        _busqueda.value = v
+    }
+
+    fun onFiltroCategoria(v: String) {
+        _categoriaFiltro.value = v
+    }
+
+    fun observar(id: Int): Flow<SolicitudEntity?> = repo.observar(id)
+
+    fun buscarPorCodigo(codigo: String, onResultado: (Int?) -> Unit) {
+        viewModelScope.launch {
+            onResultado(repo.buscarPorCodigo(codigo.trim())?.id)
+        }
+    }
+
+    fun eliminar(id: Int, onListo: () -> Unit) {
+        viewModelScope.launch {
+            repo.eliminar(id)
+            onListo()
+        }
+    }
 
     fun cargar(id: Int) {
         if (id == 0) return

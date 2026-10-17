@@ -1,5 +1,7 @@
 package com.example.dsy1105_005d_2026.ui.solicitud
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,12 +34,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import java.io.File
 
-private val categorias = listOf("Reclamo", "Consulta", "Sugerencia", "Soporte")
+val categorias = listOf("Reclamo", "Consulta", "Sugerencia", "Soporte")
 private val servicios = listOf("Instalación", "Mantención", "Soporte técnico", "Facturación")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +56,22 @@ fun SolicitudFormScreen(
 
     val camara = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         if (ok) vm.onEvidenciaChange(fotoPendiente)
+    }
+
+    val tomarFoto = {
+        val carpeta = File(context.filesDir, "evidencias").apply { mkdirs() }
+        val archivo = File(carpeta, "ev_${System.currentTimeMillis()}.jpg")
+        val uri: Uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            archivo
+        )
+        fotoPendiente = uri.toString()
+        camara.launch(uri)
+    }
+
+    val pedirPermiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) tomarFoto()
     }
 
     LaunchedEffect(id) { vm.cargar(id) }
@@ -75,6 +94,7 @@ fun SolicitudFormScreen(
             if (state.codigo.isNotEmpty()) {
                 Text("Código: ${state.codigo}")
                 Text("Estado: ${state.estado}")
+                Text("Fecha: ${formatoFecha(state.fecha)}")
             }
 
             OutlinedTextField(
@@ -101,15 +121,11 @@ fun SolicitudFormScreen(
 
             OutlinedButton(
                 onClick = {
-                    val carpeta = File(context.filesDir, "evidencias").apply { mkdirs() }
-                    val archivo = File(carpeta, "ev_${System.currentTimeMillis()}.jpg")
-                    val uri: Uri = FileProvider.getUriForFile(
+                    val concedido = ContextCompat.checkSelfPermission(
                         context,
-                        "${context.packageName}.fileprovider",
-                        archivo
-                    )
-                    fotoPendiente = uri.toString()
-                    camara.launch(uri)
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (concedido) tomarFoto() else pedirPermiso.launch(Manifest.permission.CAMERA)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

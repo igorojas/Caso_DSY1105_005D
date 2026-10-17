@@ -7,7 +7,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.dsy1105_005d_2026.ui.Home.MuestraDatosScreen
+import com.example.dsy1105_005d_2026.ui.solicitud.DetalleSolicitudScreen
 import com.example.dsy1105_005d_2026.ui.solicitud.ListaSolicitudesScreen
+import com.example.dsy1105_005d_2026.ui.solicitud.QrScannerScreen
 import com.example.dsy1105_005d_2026.ui.solicitud.SolicitudFormScreen
 import com.example.dsy1105_005d_2026.ui.theme.HomeScreen
 
@@ -31,7 +33,29 @@ fun AppNavigation() {
         composable("lista") {
             ListaSolicitudesScreen(
                 onAgregar = { navController.navigate("form/0") },
-                onSeleccionar = { navController.navigate("form/$it") }
+                onSeleccionar = { navController.navigate("detalle/$it") },
+                onEscanear = { navController.navigate("qr") }
+            )
+        }
+
+        composable(
+            route = "detalle/{id}",
+            arguments = listOf(navArgument("id") { type = NavType.IntType })
+        ) { entry ->
+            DetalleSolicitudScreen(
+                id = entry.arguments?.getInt("id") ?: 0,
+                onEditar = { navController.navigate("form/$it") },
+                onEliminado = { navController.popBackStack() }
+            )
+        }
+
+        composable("qr") {
+            QrScannerScreen(
+                onEncontrado = { id ->
+                    navController.navigate("detalle/$id") {
+                        popUpTo("qr") { inclusive = true }
+                    }
+                }
             )
         }
 
